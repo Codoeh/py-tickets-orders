@@ -56,11 +56,13 @@ class MovieViewSet(viewsets.ModelViewSet):
 
         if actors:
             actors_ids = [int(actor_id) for actor_id in actors.split(",")]
-            queryset = queryset.filter(actors__id__in=actors_ids)
+            queryset = queryset.filter(
+                actors__id__in=actors_ids).order_by("actors")
 
         if genres:
             genres_ids = [int(genre_id) for genre_id in genres.split(",")]
-            queryset = queryset.filter(genres__id__in=genres_ids)
+            queryset = queryset.filter(
+                genres__id__in=genres_ids).order_by("genres")
 
         if title:
             queryset = queryset.filter(title__icontains=title)
@@ -97,16 +99,18 @@ class MovieSessionViewSet(viewsets.ModelViewSet):
                         * F("cinema_hall__seats_in_row")
                         - Count("tickets"))
                 )
-            ).order_by("id")
-            return queryset
+            )
 
         if date:
             try:
                 start_date = datetime.strptime(date, "%Y-%m-%d")
-                start_date = make_aware(start_date)
+                start_date = make_aware(datetime.combine(
+                    start_date, datetime.min.time()))
                 end_date = start_date + timedelta(days=1)
                 queryset = queryset.filter(
-                    show_time__range=(start_date, end_date))
+                    show_time__gte=start_date,
+                    show_time__lt=end_date,
+                )
             except ValueError:
                 raise ValidationError("Invalid date format. Use YYYY-MM-DD")
 
