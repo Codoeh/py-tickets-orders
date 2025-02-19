@@ -19,6 +19,7 @@ from cinema.serializers import (
     OrderListSerializer,
     MovieSessionAdvancedListSerializer,
 )
+from cinema_service.pagination import OrderPagination
 
 
 class GenreViewSet(viewsets.ModelViewSet):
@@ -124,6 +125,7 @@ class MovieSessionViewSet(viewsets.ModelViewSet):
 class OrderViewSet(viewsets.ModelViewSet):
     queryset = Order.objects.all()
     serializer_class = OrderSerializer
+    pagination_class = OrderPagination
 
     def get_queryset(self):
         queryset = Order.objects.filter(user=self.request.user)
