@@ -1,10 +1,13 @@
-from datetime import datetime, timedelta
-
 from django.db.models import Count, F
-from django.utils.timezone import make_aware
 from rest_framework import viewsets
-from rest_framework.exceptions import ValidationError
 
+from cinema.functions import (
+    _filter_by_actor_id,
+    _filter_by_genre_id,
+    _filter_by_movie_title,
+    _filter_by_date,
+    _filter_by_movie_id,
+)
 from cinema.models import Genre, Actor, CinemaHall, Movie, MovieSession, Order
 from cinema.serializers import (
     GenreSerializer,
@@ -53,20 +56,16 @@ class MovieViewSet(viewsets.ModelViewSet):
 
         actors = self.request.GET.get("actors")
         genres = self.request.GET.get("genres")
-        title = self.request.GET.get("title")
+        movie_title = self.request.GET.get("title")
 
         if actors:
-            actors_ids = [int(actor_id) for actor_id in actors.split(",")]
-            queryset = queryset.filter(
-                actors__id__in=actors_ids).order_by("actors")
+            queryset = _filter_by_actor_id(queryset, actors)
 
         if genres:
-            genres_ids = [int(genre_id) for genre_id in genres.split(",")]
-            queryset = queryset.filter(
-                genres__id__in=genres_ids).order_by("genres")
+            queryset = _filter_by_genre_id(queryset, genres)
 
-        if title:
-            queryset = queryset.filter(title__icontains=title)
+        if movie_title:
+            queryset = _filter_by_movie_title(queryset, movie_title)
 
         return queryset.distinct()
 
@@ -103,21 +102,9 @@ class MovieSessionViewSet(viewsets.ModelViewSet):
             )
 
         if date:
-            try:
-                start_date = datetime.strptime(date, "%Y-%m-%d")
-                start_date = make_aware(datetime.combine(
-                    start_date, datetime.min.time()))
-                end_date = start_date + timedelta(days=1)
-                queryset = queryset.filter(
-                    show_time__gte=start_date,
-                    show_time__lt=end_date,
-                )
-            except ValueError:
-                raise ValidationError("Invalid date format. Use YYYY-MM-DD")
-
+            queryset = _filter_by_date(queryset, date)
         if movies:
-            movie_ids = [int(movie) for movie in movies.split(",")]
-            queryset = queryset.filter(movie_id__in=movie_ids)
+            queryset = _filter_by_movie_id(queryset, movies)
 
         return queryset.distinct()
 
@@ -128,10 +115,13 @@ class OrderViewSet(viewsets.ModelViewSet):
     pagination_class = OrderPagination
 
     def get_queryset(self):
-        queryset = Order.objects.filter(user=self.request.user)
-        return queryset.select_related("user").prefetch_related(
-            "tickets__movie_session__cinema_hall",
-            "tickets__movie_session__movie",
+        return (
+            self.queryset.filter(user=self.request.user)
+            .select_related("user")
+            .prefetch_related(
+                "tickets__movie_session__cinema_hall",
+                "tickets__movie_session__movie",
+            )
         )
 
     def perform_create(self, serializer):
